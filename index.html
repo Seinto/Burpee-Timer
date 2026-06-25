@@ -207,22 +207,21 @@
     let workoutStartTime = null;
     let workoutEndTime = null;
 
-    // 【重要】ガベージコレクション対策：発話オブジェクトをブラウザに消されないよう配列に保持する
+    // 【Safari対策①】音声オブジェクトがメモリ解放で消されないよう配列に保持する
     let speechQueue = [];
 
     function speakCount(number) {
         if ('speechSynthesis' in window) {
-            // iOSフリーズバグ対策：cancel() は絶対に実行しない
+            // 【Safari対策②】絶対に cancel() を呼ばない（iOSで音声エンジンが壊れる原因）
             
             const utterance = new SpeechSynthesisUtterance(String(number));
-            utterance.lang = 'en-US'; 
-            utterance.rate = 1.4; // 1秒以内に確実に喋り終えるよう、少し早口に設定
+            utterance.lang = 'en-US'; // 英語カウント。日本語が良ければ 'ja-JP' に変更
+            utterance.rate = 1.4;     // 次の秒数に被らないよう少し早口に設定
             utterance.volume = 1.0;
 
-            // メモリ解放対策として配列に突っ込む
+            // キューに突っ込んで参照を維持（ガベージコレクション対策）
             speechQueue.push(utterance);
             
-            // 再生が終わったら配列から削除
             utterance.onend = () => {
                 speechQueue = speechQueue.filter(u => u !== utterance);
             };
@@ -232,11 +231,11 @@
     }
 
     function startWorkout() {
-        // 「開始ボタン」を押した瞬間に、無音ではなく「Start」と喋らせて音声エンジンを完全に起こす
+        // 【Safari対策③】タップした「その瞬間」にダミー音声を発声させてオーディオ権限を完全にロック解除
         if ('speechSynthesis' in window) {
             const initUtterance = new SpeechSynthesisUtterance('Start');
             initUtterance.lang = 'en-US';
-            initUtterance.volume = 0.1; // 爆音にならないよう音量は控えめ
+            initUtterance.volume = 0.1; // 控えめな音量
             window.speechSynthesis.speak(initUtterance);
         }
 
@@ -274,7 +273,7 @@
             timeRemaining--;
             updateDisplay();
 
-            // 残り5秒以下、かつ0秒より大きい場合にカウントダウン
+            // 残り5秒以下、かつ0秒より大きい場合にカウントダウン音声を発火
             if (timeRemaining <= 5 && timeRemaining > 0) {
                 speakCount(timeRemaining);
             }
@@ -309,7 +308,7 @@
         if (confirm("トレーニングを中断して元の画面に戻りますか？\n（現在の実績は記録されません）")) {
             if (timerId) clearInterval(timerId);
             if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
+                window.speechSynthesis.cancel(); // 中断時のみクリア
             }
             speechQueue = [];
             resetApp();
