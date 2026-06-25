@@ -201,36 +201,49 @@
 
     let totalSets = 0;
     let currentSet = 1;
-    let isWorking = true; // true: バーピー(20秒), false: 休憩(10秒)
+    let isWorking = true; 
     let timeRemaining = 0;
     let timerId = null;
     let workoutStartTime = null;
     let workoutEndTime = null;
 
-    // 音声読み上げ用の関数
+    // 【重要】ガベージコレクション対策：発話オブジェクトをブラウザに消されないよう配列に保持する
+    let speechQueue = [];
+
     function speakCount(number) {
         if ('speechSynthesis' in window) {
-            // 音声キューをクリアして遅延を防ぐ
-            window.speechSynthesis.cancel();
+            // iOSフリーズバグ対策：cancel() は絶対に実行しない
             
             const utterance = new SpeechSynthesisUtterance(String(number));
-            utterance.lang = 'en-US'; // 英語カウント（日本語がよければ 'ja-JP' に変更）
-            utterance.rate = 1.3;     // テンポ良く発音させるため少し早めに
+            utterance.lang = 'en-US'; 
+            utterance.rate = 1.4; // 1秒以内に確実に喋り終えるよう、少し早口に設定
+            utterance.volume = 1.0;
+
+            // メモリ解放対策として配列に突っ込む
+            speechQueue.push(utterance);
+            
+            // 再生が終わったら配列から削除
+            utterance.onend = () => {
+                speechQueue = speechQueue.filter(u => u !== utterance);
+            };
+
             window.speechSynthesis.speak(utterance);
         }
     }
 
     function startWorkout() {
-        // 【重要】ユーザーがボタンを押したこの瞬間に、空の音声を再生してブラウザの音声制限を解除する
+        // 「開始ボタン」を押した瞬間に、無音ではなく「Start」と喋らせて音声エンジンを完全に起こす
         if ('speechSynthesis' in window) {
-            const unlockUtterance = new SpeechSynthesisUtterance('');
-            window.speechSynthesis.speak(unlockUtterance);
+            const initUtterance = new SpeechSynthesisUtterance('Start');
+            initUtterance.lang = 'en-US';
+            initUtterance.volume = 0.1; // 爆音にならないよう音量は控えめ
+            window.speechSynthesis.speak(initUtterance);
         }
 
         totalSets = parseInt(document.getElementById('sets-input').value) || 8;
         currentSet = 1;
         isWorking = true;
-        workoutStartTime = new Date(); // 開始時間の記録
+        workoutStartTime = new Date(); 
 
         document.getElementById('setup-section').style.display = 'none';
         document.getElementById('timer-section').style.display = 'block';
@@ -245,7 +258,6 @@
         
         statusEl.innerText = statusText;
         
-        // 状態に応じたネオンカラーの切り替え
         if (isWorking) {
             statusEl.style.color = '#ff4757';
             ringEl.className = 'timer-circle working';
@@ -262,7 +274,7 @@
             timeRemaining--;
             updateDisplay();
 
-            // 残り5秒以下、かつ0秒より大きい場合にカウントダウン音声を発火
+            // 残り5秒以下、かつ0秒より大きい場合にカウントダウン
             if (timeRemaining <= 5 && timeRemaining > 0) {
                 speakCount(timeRemaining);
             }
@@ -293,22 +305,23 @@
         }
     }
 
-    // 中断（キャンセル）ボタンが押された時の処理
     function cancelWorkout() {
         if (confirm("トレーニングを中断して元の画面に戻りますか？\n（現在の実績は記録されません）")) {
             if (timerId) clearInterval(timerId);
-            if ('speechSynthesis' in window) window.speechSynthesis.cancel(); // 音声も止める
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+            speechQueue = [];
             resetApp();
         }
     }
 
     function endWorkout() {
-        workoutEndTime = new Date(); // 終了時間の記録
+        workoutEndTime = new Date(); 
         document.getElementById('timer-section').style.display = 'none';
         document.getElementById('result-section').style.display = 'block';
     }
 
-    // .ics (iCalendar) ファイルを生成してダウンロードする関数
     function downloadIcsFile() {
         if (!workoutStartTime || !workoutEndTime) return;
 
@@ -355,9 +368,8 @@
 
     function resetApp() {
         document.getElementById('result-section').style.display = 'none';
-        document.getElementById('timer-section').style.display = 'none'; // キャンセル時考慮
+        document.getElementById('timer-section').style.display = 'none'; 
         document.getElementById('setup-section').style.display = 'block';
-        // タイマー用の円のクラスをリセット
         document.getElementById('timer-ring').className = 'timer-circle';
         document.getElementById('timer').innerText = '00';
     }
