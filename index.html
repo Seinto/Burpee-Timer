@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Burpee-Timer</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a202c">
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            text-align: center; 
+            background: #0f1319; 
+            color: #f7fafc;
+            margin: 0; 
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container { 
+            width: 100%;
+            max-width: 420px; 
+            margin: 20px;
+            background: #171e29; 
+            padding: 40px 30px; 
+            border-radius: 24px; 
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1); 
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        h1 { 
+            font-size: 22px; 
+            font-weight: 800; 
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: #a0aec0;
+            margin-top: 0;
+            margin-bottom: 30px; 
+        }
+        
+        /* タイマーサークル・ディスプレイ */
+        .timer-circle {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto 24px auto;
+            border-radius: 50%;
+            background: #101622;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border: 4px solid #2d3748;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+            transition: border-color 0.4s ease, box-shadow 0.4s ease;
+        }
+        .timer-circle.working {
+            border-color: #ff4757;
+            box-shadow: 0 0 30px rgba(255, 71, 87, 0.25);
+        }
+        .timer-circle.resting {
+            border-color: #2ed573;
+            box-shadow: 0 0 30px rgba(46, 213, 115, 0.25);
+        }
+
+        .timer-display { 
+            font-size: 64px; 
+            font-weight: 800; 
+            color: #ffffff; 
+            font-variant-numeric: tabular-nums; 
+            line-height: 1;
+        }
+        .status-display { 
+            font-size: 24px; 
+            font-weight: 700; 
+            margin-bottom: 5px; 
+            letter-spacing: 0.02em;
+        }
+        .set-display { 
+            font-size: 15px; 
+            color: #718096; 
+            font-weight: 600;
+            background: #232d3f;
+            padding: 6px 16px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-bottom: 35px;
+        }
+        
+        /* 入力フォーム設定 */
+        .input-group { margin: 35px 0; }
+        label { font-size: 15px; color: #a0aec0; display: block; margin-bottom: 12px; font-weight: 600; }
+        input[type="number"] { 
+            width: 100px; 
+            padding: 12px; 
+            font-size: 24px; 
+            font-weight: 700;
+            text-align: center; 
+            background: #101622;
+            color: #fff;
+            border: 2px solid #2d3748; 
+            border-radius: 12px; 
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="number"]:focus { border-color: #4a90e2; }
+        
+        /* ボタン共通 */
+        button { 
+            width: 100%; 
+            padding: 16px; 
+            font-size: 16px; 
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            cursor: pointer; 
+            background: linear-gradient(135deg, #4a90e2, #357abd); 
+            color: white; 
+            border: none; 
+            border-radius: 14px; 
+            transition: all 0.2s ease; 
+            box-shadow: 0 4px 12px rgba(74,144,226,0.3);
+        }
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(74,144,226,0.4);
+        }
+        button:active { transform: translateY(1px); }
+        
+        /* キャンセル・サブボタン */
+        button.secondary { 
+            background: #2d3748; 
+            color: #a0aec0; 
+            box-shadow: none; 
+            margin-top: 15px; 
+        }
+        button.secondary:hover {
+            background: #3a475c;
+            color: #fff;
+            box-shadow: none;
+        }
+        button.danger {
+            background: rgba(255, 71, 87, 0.1);
+            color: #ff4757;
+            border: 1px solid rgba(255, 71, 87, 0.3);
+            box-shadow: none;
+            margin-top: 20px;
+        }
+        button.danger:hover {
+            background: #ff4757;
+            color: white;
+            box-shadow: 0 4px 12px rgba(255, 71, 87, 0.2);
+        }
+        
+        .success-icon { font-size: 56px; margin-bottom: 20px; animation: bounce 1s infinite alternate; }
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-10px); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Burpee Timer</h1>
+    
+    <div id="setup-section">
+        <div class="input-group">
+            <label for="sets-input">実施するセット数</label>
+            <input type="number" id="sets-input" value="8" min="1" max="99">
+        </div>
+        <button id="start-btn" onclick="startWorkout()">ワークアウト開始</button>
+    </div>
+
+    <div id="timer-section" style="display:none;">
+        <div id="status" class="status-display">準備</div>
+        
+        <div id="timer-ring" class="timer-circle">
+            <div id="timer" class="timer-display">00</div>
+        </div>
+
+        <div id="set-count" class="set-display">0 / 0 セット</div>
+        
+        <button class="danger" onclick="cancelWorkout()">トレーニングを中断する</button>
+    </div>
+
+    <div id="result-section" style="display:none;">
+        <div class="success-icon">🎉</div>
+        <h2 style="font-size: 24px; margin-bottom: 10px;">トレーニング完了！</h2>
+        <p style="color:#a0aec0; margin-bottom:30px; font-size: 15px;">ナイスファイト！実績を記録しましょう。</p>
+        <button id="calendar-btn" onclick="downloadIcsFile()">.icsカレンダー履歴を出力</button>
+        <button class="secondary" onclick="resetApp()">最初に戻る</button>
+    </div>
+</div>
+
+<script>
+    // Service Worker の登録
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').then(() => console.log('SW Registered'));
+    }
+
+    let totalSets = 0;
+    let currentSet = 1;
+    let isWorking = true; // true: バーピー(20秒), false: 休憩(10秒)
+    let timeRemaining = 0;
+    let timerId = null;
+    let workoutStartTime = null;
+    let workoutEndTime = null;
+
+    // 音声読み上げ用の関数
+    function speakCount(number) {
+        if ('speechSynthesis' in window) {
+            // 前の再生が残っている場合は強制終了して遅延を防ぐ
+            window.speechSynthesis.cancel();
+            
+            const utterance = new SpeechSynthesisUtterance(String(number));
+            utterance.lang = 'en-US'; // 筋トレのカウントに合うよう英語に設定（日本語が良い場合は 'ja-JP'）
+            utterance.rate = 1.2;     // テンポよくカウントするために少し早めに設定
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+
+    function startWorkout() {
+        totalSets = parseInt(document.getElementById('sets-input').value) || 8;
+        currentSet = 1;
+        isWorking = true;
+        workoutStartTime = new Date(); // 開始時間の記録
+
+        document.getElementById('setup-section').style.display = 'none';
+        document.getElementById('timer-section').style.display = 'block';
+        
+        startInterval(20, "バーピー (GO!)");
+    }
+
+    function startInterval(seconds, statusText) {
+        timeRemaining = seconds;
+        const statusEl = document.getElementById('status');
+        const ringEl = document.getElementById('timer-ring');
+        
+        statusEl.innerText = statusText;
+        
+        // 状態に応じたネオンカラーの切り替え
+        if (isWorking) {
+            statusEl.style.color = '#ff4757';
+            ringEl.className = 'timer-circle working';
+        } else {
+            statusEl.style.color = '#2ed573';
+            ringEl.className = 'timer-circle resting';
+        }
+        
+        document.getElementById('set-count').innerText = `セット: ${currentSet} / ${totalSets}`;
+        
+        updateDisplay();
+
+        timerId = setInterval(() => {
+            timeRemaining--;
+            updateDisplay();
+
+            // 残り5秒以下、かつ0秒より大きい場合にカウントダウン音声を発火
+            if (timeRemaining <= 5 && timeRemaining > 0) {
+                speakCount(timeRemaining);
+            }
+
+            if (timeRemaining <= 0) {
+                clearInterval(timerId);
+                nextStep();
+            }
+        }, 1000);
+    }
+
+    function updateDisplay() {
+        document.getElementById('timer').innerText = String(timeRemaining).padStart(2, '0');
+    }
+
+    function nextStep() {
+        if (isWorking) {
+            isWorking = false;
+            startInterval(10, "休憩 (REST)");
+        } else {
+            if (currentSet < totalSets) {
+                currentSet++;
+                isWorking = true;
+                startInterval(20, "バーピー (GO!)");
+            } else {
+                endWorkout();
+            }
+        }
+    }
+
+    // 中断（キャンセル）ボタンが押された時の処理
+    function cancelWorkout() {
+        if (confirm("トレーニングを中断して元の画面に戻りますか？\n（現在の実績は記録されません）")) {
+            if (timerId) clearInterval(timerId);
+            if ('speechSynthesis' in window) window.speechSynthesis.cancel(); // 音声も止める
+            resetApp();
+        }
+    }
+
+    function endWorkout() {
+        workoutEndTime = new Date(); // 終了時間の記録
+        document.getElementById('timer-section').style.display = 'none';
+        document.getElementById('result-section').style.display = 'block';
+    }
+
+    // .ics (iCalendar) ファイルを生成してダウンロードする関数
+    function downloadIcsFile() {
+        if (!workoutStartTime || !workoutEndTime) return;
+
+        const formatCalDate = (date) => {
+            return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        };
+
+        const startStr = formatCalDate(workoutStartTime);
+        const endStr = formatCalDate(workoutEndTime);
+        const createdStr = formatCalDate(new Date());
+
+        const icsContent = [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//Burpee Timer//Workout Tracker//JA",
+            "CALSCALE:GREGORIAN",
+            "BEGIN:VEVENT",
+            `DTSTAMP:${createdStr}`,
+            `DTSTART:${startStr}`,
+            `DTEND:${endStr}`,
+            "SUMMARY:筋トレ: バーピージャンプ",
+            `DESCRIPTION:${totalSets}セットのインターバルトレーニングを完了しました。`,
+            "STATUS:CONFIRMED",
+            "TRANSP:OPAQUE",
+            "END:VEVENT",
+            "END:VCALENDAR"
+        ].join("\r\n");
+
+        const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8;" });
+        const link = document.createElement("a");
+        
+        const fileDate = workoutStartTime.getFullYear() + 
+                         String(workoutStartTime.getMonth() + 1).padStart(2, '0') + 
+                         String(workoutStartTime.getDate()).padStart(2, '0') + "_" +
+                         String(workoutStartTime.getHours()).padStart(2, '0') + 
+                         String(workoutStartTime.getMinutes()).padStart(2, '0');
+        
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute("download", `burpee_workout_${fileDate}.ics`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function resetApp() {
+        document.getElementById('result-section').style.display = 'none';
+        document.getElementById('timer-section').style.display = 'none'; // キャンセル時考慮
+        document.getElementById('setup-section').style.display = 'block';
+        // タイマー用の円のクラスをリセット
+        document.getElementById('timer-ring').className = 'timer-circle';
+        document.getElementById('timer').innerText = '00';
+    }
+</script>
+</body>
+</html>
