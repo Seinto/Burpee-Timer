@@ -210,17 +210,23 @@
     // 音声読み上げ用の関数
     function speakCount(number) {
         if ('speechSynthesis' in window) {
-            // 前の再生が残っている場合は強制終了して遅延を防ぐ
+            // 音声キューをクリアして遅延を防ぐ
             window.speechSynthesis.cancel();
             
             const utterance = new SpeechSynthesisUtterance(String(number));
-            utterance.lang = 'en-US'; // 筋トレのカウントに合うよう英語に設定（日本語が良い場合は 'ja-JP'）
-            utterance.rate = 1.2;     // テンポよくカウントするために少し早めに設定
+            utterance.lang = 'en-US'; // 英語カウント（日本語がよければ 'ja-JP' に変更）
+            utterance.rate = 1.3;     // テンポ良く発音させるため少し早めに
             window.speechSynthesis.speak(utterance);
         }
     }
 
     function startWorkout() {
+        // 【重要】ユーザーがボタンを押したこの瞬間に、空の音声を再生してブラウザの音声制限を解除する
+        if ('speechSynthesis' in window) {
+            const unlockUtterance = new SpeechSynthesisUtterance('');
+            window.speechSynthesis.speak(unlockUtterance);
+        }
+
         totalSets = parseInt(document.getElementById('sets-input').value) || 8;
         currentSet = 1;
         isWorking = true;
